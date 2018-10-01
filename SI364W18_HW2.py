@@ -14,7 +14,8 @@
 from flask import Flask, request, render_template, url_for
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField, RadioField, ValidationError
-from wtforms.validators import Required
+from wtforms.validators import Required, DataRequired
+import requests
 
 #####################
 ##### APP SETUP #####
@@ -23,11 +24,26 @@ from wtforms.validators import Required
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'hardtoguessstring'
 
+def fetch_iTunes(term):
+    baseurl = "https://itunes.apple.com/search"
+    params = {  "term":  term,
+                "media": 'music'}
+    response    = requests.get(baseurl, params = params).json()
+    return response['results']
+
+
 ####################
 ###### FORMS #######
 ####################
 
+class AlbumEntryForm(FlaskForm):
+    album = StringField('Enter the name of an album:', validators=[Required()])
 
+    options =[('1',1),('2',2),('3',3)]
+
+    like   = RadioField('How much do you like this album? (1 low, 3 high)', validators=[Required()], choices = options)
+
+    submit = SubmitField('Submit')
 
 
 ####################
@@ -38,10 +54,53 @@ app.config['SECRET_KEY'] = 'hardtoguessstring'
 def hello_world():
     return 'Hello World!'
 
-
 @app.route('/user/<name>')
 def hello_user(name):
     return '<h1>Hello {0}<h1>'.format(name)
+
+
+
+
+@app.route('/artistform')
+def artistform():
+    return render_template('artistform.html')
+
+@app.route('/artistinfo', methods = ['GET'])
+def artistinfo():
+    artist = request.args.get("artist")
+    results = fetch_iTunes(artist)
+    return render_template('artist_info.html', objects = results)
+
+@app.route('/artistlinks')
+def artistlinks():
+    return render_template('artist_links.html')
+
+@app.route('/specific/song/<artist_name>')
+def specific_artist(artist_name):
+    results = fetch_iTunes(artist_name)
+    return render_template('specific_artist.html', results = results)
+
+
+
+
+
+
+@app.route('/album_entry')
+def album_entry():
+    form = AlbumEntryForm()
+    return render_template('album_entry.html', form = form)
+
+
+@app.route('/album_result', methods=['POST','GET'])
+def album_result():
+    form = AlbumEntryForm()    
+    if form.validate_on_submit():
+        return render_template('album_data.html', form=form)
+    else:
+        return "Sorry, try again!"
+        print(form.errors)
+
+
 
 
 if __name__ == '__main__':
